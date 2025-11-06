@@ -70,7 +70,7 @@ fastapi-chat-app/
 
 ---
 
-## ⚙️ Customization Ideas
+## ⚙️ Future Scope and works
 - Add **user authentication (JWT)**
 - Store **chat history** in a database (SQLite, PostgreSQL)
 - Integrate **Redis Pub/Sub** for distributed chat rooms
@@ -80,7 +80,8 @@ fastapi-chat-app/
 ---
 
 ## 📸 Screenshot
-*(Optional — add an image of your running chat app here)*
+![Ui Interface](<Screenshot (114).png>)
+![Code snippet](<Screenshot (115).png>)
 
 ---
 

@@ -26,7 +26,7 @@ async def get():
 </style>
 </head>
 <body>
-  <h2>💬 FastAPI Chat</h2>
+  <h2>FastAPI Chat</h2>
   <input id="username" placeholder="Enter username" style="width: 200px; margin-bottom: 10px;"/>
   <input id="room" placeholder="Enter room name" style="width: 200px; margin-bottom: 10px;"/>
   <button id="connect">Join Room</button>
