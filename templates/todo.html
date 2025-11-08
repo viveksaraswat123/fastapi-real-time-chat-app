@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Todo App (CRUD + Fetch API)</title>
+  <style>
+    body { font-family: Arial; background: #f7f7f7; margin: 0; padding: 20px; }
+    h1 { text-align: center; margin-bottom: 20px; }
+    #todo-form { display: flex; justify-content: center; margin-bottom: 20px; }
+    input { padding: 10px; width: 250px; border: 1px solid #ccc; border-radius: 5px; }
+    button { padding: 10px 15px; margin-left: 10px; cursor: pointer; border: none; background: #007BFF; color: white; border-radius: 5px; }
+    ul { list-style: none; padding: 0; max-width: 400px; margin: auto; }
+    li { background: white; padding: 10px; margin: 8px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
+    .actions button { margin-left: 5px; border-radius: 4px; border: none; cursor: pointer; padding: 5px 8px; }
+    .edit { background: #ffc107; }
+    .delete { background: #dc3545; color: white; }
+    .toggle { background: #28a745; color: white; }
+    .completed { text-decoration: line-through; color: gray; }
+  </style>
+</head>
+<body>
+
+  <h1>📋 Todo App (CRUD)</h1>
+
+  <form id="todo-form">
+    <input type="text" id="todo-input" placeholder="Enter new todo..." required />
+    <button type="submit">Add Todo</button>
+  </form>
+
+  <ul id="todo-list"></ul>
+
+  <script>
+    const API_URL = 'https://jsonplaceholder.typicode.com/todos';
+    const form = document.getElementById('todo-form');
+    const input = document.getElementById('todo-input');
+    const list = document.getElementById('todo-list');
+
+    // Fetch (Read)
+    async function fetchTodos() {
+      const res = await fetch(API_URL);
+      const todos = await res.json();
+      displayTodos(todos.slice(0, 7)); // Limit for demo
+    }
+
+    function displayTodos(todos) {
+      list.innerHTML = '';
+      todos.forEach(todo => {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="${todo.completed ? 'completed' : ''}">${todo.title}</span>
+          <div class="actions">
+            <button class="toggle" onclick="toggleTodo(${todo.id}, ${!todo.completed})">
+              ${todo.completed ? 'Undo' : 'Done'}
+            </button>
+            <button class="edit" onclick="editTodoPrompt(${todo.id}, '${todo.title.replace(/'/g, "\\'")}')">Edit</button>
+            <button class="delete" onclick="deleteTodo(${todo.id})">Delete</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    // Create
+    async function addTodo(title) {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, completed: false })
+      });
+      const newTodo = await res.json();
+      alert(`✅ Added: ${newTodo.title}`);
+      fetchTodos();
+    }
+
+    // Update (Edit Title)
+    async function editTodoPrompt(id, oldTitle) {
+      const newTitle = prompt('Edit your todo:', oldTitle);
+      if (newTitle && newTitle.trim() !== '') {
+        await fetch(`${API_URL}/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: newTitle, completed: false })
+        });
+        alert('✏️ Todo updated!');
+        fetchTodos();
+      }
+    }
+
+    // Toggle (Mark as Done / Undo)
+    async function toggleTodo(id, completed) {
+      await fetch(`${API_URL}/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ completed })
+      });
+      fetchTodos();
+    }
+
+    // Delete
+    async function deleteTodo(id) {
+      await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+      alert(`🗑️ Deleted todo #${id}`);
+      fetchTodos();
+    }
+
+    // Form Submit
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = input.value.trim();
+      if (title) {
+        await addTodo(title);
+        input.value = '';
+      }
+    });
+
+    fetchTodos(); // Initial load
+  </script>
+
+</body>
+</html>
