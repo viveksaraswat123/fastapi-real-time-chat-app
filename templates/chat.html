@@ -1,146 +1,150 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>FastAPI Real-Time Chat</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chat Room with File Sharing & Image Preview</title>
 <style>
   * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-  body {
-    background: linear-gradient(135deg, #d9dce1, #00d4ff);
-    height: 100vh; display: flex; justify-content: center; align-items: center;
-    margin: 0;
+  body { background: linear-gradient(135deg,#0078ff,#00d4ff); height:100vh; margin:0; display:flex; justify-content:center; align-items:center; }
+  .chat-container { width:700px; background:white; border-radius:12px; box-shadow:0 6px 30px rgba(0,0,0,0.2); display:flex; flex-direction:column; overflow:hidden; }
+  .header { padding:12px 16px; background:#0078ff; color:white; display:flex; justify-content:space-between; align-items:center; }
+  #chat-box { flex:1; padding:16px; background:#f9f9f9; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+  .message { max-width:70%; padding:10px 12px; border-radius:10px; word-wrap:break-word; }
+  .me { align-self:flex-end; background:#d1f0ff; border-bottom-right-radius:0; }
+  .other { align-self:flex-start; background:#ececec; border-bottom-left-radius:0; }
+  .system { align-self:center; color:#666; font-size:13px; background:transparent; }
+  .timestamp { display:block; font-size:10px; color:#555; margin-top:6px; text-align:right; }
+  #controls { display:flex; padding:12px; border-top:1px solid #eee; gap:8px; }
+  #msg { flex:1; padding:10px; border-radius:8px; border:1px solid #ccc; }
+  button { padding:10px 14px; border-radius:8px; background:#0078ff; color:white; border:none; cursor:pointer; }
+  input[type=file] { display:none; }
+  label.upload-btn {
+    background:#0078ff; color:white; padding:10px 14px; border-radius:8px; cursor:pointer;
   }
-  .chat-container {
-    width: 420px; background: white; border-radius: 12px; overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    display: flex; 
-    flex-direction: column;
+  img.preview {
+    max-width:200px; max-height:200px; margin-top:5px; border-radius:8px; display:block;
   }
-  .header {
-    background: #0078ff; color: white; padding: 12px; text-align: center;
-    font-weight: bold; letter-spacing: 1px;
-  }
-  #chat-box {
-    flex: 1; padding: 10px; overflow-y: auto; background: #f9f9f9;
-    display: flex; flex-direction: column;
-  }
-  .message {
-    max-width: 75%; margin: 5px 0; padding: 8px 12px; border-radius: 10px;
-    position: relative; word-wrap: break-word; animation: fadeIn 0.3s ease-in;
-  }
-  .me { align-self: flex-end; background: #d1f0ff; border-bottom-right-radius: 0; }
-  .other { align-self: flex-start; background: #ebebeb; border-bottom-left-radius: 0; }
-  .system { align-self: center; background: transparent; color: gray; font-size: 13px; }
-  .timestamp {
-    display: block; text-align: right; font-size: 10px; color: gray; margin-top: 2px;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  #controls {
-    display: flex; border-top: 1px solid #ddd;
-  }
-  #msg {
-    flex: 1; border: none; padding: 10px; font-size: 14px;
-  }
-  #msg:focus { outline: none; }
-  #send {
-    background: #0078ff; color: white; border: none; padding: 10px 16px;
-    cursor: pointer; font-weight: bold;
-  }
-  #send:disabled { background: #ccc; cursor: not-allowed; }
-  .top-inputs {
-    padding: 10px; display: flex; flex-direction: column; gap: 8px;
-    background: #f0f6ff;
-  }
-  .top-inputs input {
-    padding: 8px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px;
-  }
-  .top-inputs button {
-    background: #0078ff; color: white; border: none; padding: 10px;
-    border-radius: 8px; cursor: pointer; font-weight: bold;
-  }
-  #typing { font-size: 12px; color: gray; margin: 4px 12px; height: 16px; }
 </style>
 </head>
 <body>
 <div class="chat-container">
-  <div class="header">FastAPI Chat</div>
-  <div class="top-inputs">
-    <input id="username" placeholder="Enter username">
-    <input id="room" placeholder="Enter room name">
-    <button id="connect">Join Room</button>
+  <div class="header">
+    <div>💬 Chat — {{ username }}</div>
+    <div><a href="/" style="color:white;text-decoration:none;">Logout</a></div>
   </div>
+
   <div id="chat-box"></div>
-  <div id="typing"></div>
+
   <div id="controls">
-    <input id="msg" placeholder="Type a message..." disabled>
-    <button id="send" disabled>Send</button>
+    <input id="msg" placeholder="Type a message..." />
+    <label for="file-input" class="upload-btn">📎</label>
+    <input type="file" id="file-input" />
+    <button id="send">Send</button>
   </div>
 </div>
 
 <script>
-let ws = null;
-let username = "";
-let room = "";
+const USERNAME = "{{ username }}";
+const ROOM = "main";
+let ws = new WebSocket(`ws://${location.host}/ws/${ROOM}?username=${USERNAME}`);
+
 const chatBox = document.getElementById('chat-box');
 const msgInput = document.getElementById('msg');
 const sendBtn = document.getElementById('send');
-const connectBtn = document.getElementById('connect');
-const typingDiv = document.getElementById('typing');
+const fileInput = document.getElementById('file-input');
 
-function addMessage(user, text, type='other') {
+function addMessage(user, content, cls='other') {
   const div = document.createElement('div');
-  div.className = 'message ' + type;
-  if (type !== 'system') {
-    const time = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    div.innerHTML = `<b>${user}</b><br>${text}<span class="timestamp">${time}</span>`;
+  div.className = 'message ' + cls;
+  const time = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+  if (cls === 'system') {
+    div.textContent = content;
   } else {
-    div.textContent = text;
+    div.innerHTML = `<b>${user}</b><div>${content}</div><span class="timestamp">${time}</span>`;
   }
+
   chatBox.appendChild(div);
   chatBox.scrollTop = chatBox.scrollHeight;
 }
 
-connectBtn.onclick = () => {
-  username = document.getElementById('username').value.trim() || 'Anonymous';
-  room = document.getElementById('room').value.trim() || 'general';
-  ws = new WebSocket(`ws://${location.host}/ws/${room}?username=${username}`);
-  ws.onopen = () => {
-    addMessage('System', `You joined room: ${room}`, 'system');
-    connectBtn.disabled = true; msgInput.disabled = false; sendBtn.disabled = false;
-  };
-  ws.onmessage = (e) => {
-    const data = JSON.parse(e.data);
-    if (data.type === 'typing') {
-      typingDiv.textContent = data.username + " is typing...";
-      clearTimeout(window.typingTimeout);
-      window.typingTimeout = setTimeout(() => typingDiv.textContent = "", 1000);
-    } else if (data.username && data.message) {
-      const isMe = data.username === username;
-      addMessage(isMe ? 'You' : data.username, data.message, isMe ? 'me' : 'other');
-    } else if (data.system) {
-      addMessage('System', data.system, 'system');
+//Handle incoming messages
+ws.onmessage = (e) => {
+  const data = JSON.parse(e.data);
+
+  if (data.system) {
+    addMessage('System', data.system, 'system');
+    return;
+  }
+
+  // Handle file
+  if (data.type === "file") {
+    const isMe = data.username === USERNAME;
+    if (isMe) return; // ✅ prevent duplicate file message for sender
+
+    let content;
+    if (/\.(jpg|jpeg|png|gif|webp)$/i.test(data.filename)) {
+      content = `<a href="${data.url}" target="_blank">${data.filename}</a>
+                 <img src="${data.url}" alt="${data.filename}" class="preview" />`;
+    } else {
+      content = `<a href="${data.url}" target="_blank">${data.filename}</a>`;
     }
-  };
-  ws.onclose = () => {
-    addMessage('System', 'Connection closed.', 'system');
-    connectBtn.disabled = false; msgInput.disabled = true; sendBtn.disabled = true;
-  };
+    addMessage(data.username + " (File)", content, 'other');
+    return;
+  }
+
+  // Normal text messages
+  if (data.username && data.message) {
+    const isMe = data.username === USERNAME;
+    addMessage(isMe ? 'You' : data.username, data.message, isMe ? 'me' : 'other');
+  }
 };
 
-sendBtn.onclick = () => {
+// ✅ Send text message
+function sendMessage() {
   const text = msgInput.value.trim();
   if (!text) return;
   ws.send(JSON.stringify({ message: text }));
   msgInput.value = '';
-};
+}
+sendBtn.onclick = sendMessage;
 
-msgInput.addEventListener('keyup', e => {
-  if (e.key === 'Enter') sendBtn.click();
-  else ws && ws.send(JSON.stringify({ typing: true }));
+// ✅ Send message on Enter key
+msgInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
 });
+
+// ✅ File upload
+fileInput.onchange = async () => {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("username", USERNAME);
+  formData.append("room", ROOM);
+
+  const res = await fetch("/upload", { method: "POST", body: formData });
+  const data = await res.json();
+
+  if (data.url) {
+    // ✅ Show file instantly (no duplicate after WebSocket broadcast)
+    let content;
+    if (/\.(jpg|jpeg|png|gif|webp)$/i.test(file.name)) {
+      content = `<a href="${data.url}" target="_blank">${file.name}</a>
+                 <img src="${data.url}" alt="${file.name}" class="preview" />`;
+    } else {
+      content = `<a href="${data.url}" target="_blank">${file.name}</a>`;
+    }
+    addMessage("You (File)", content, "me");
+  }
+
+  fileInput.value = ""; // reset input
+};
 </script>
 </body>
 </html>
